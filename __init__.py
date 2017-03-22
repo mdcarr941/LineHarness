@@ -9,7 +9,7 @@ import logging
 import curses
 from curses import ascii
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 
@@ -87,21 +87,21 @@ class Log(threading.Thread):
         raise StopLogException
       self.write(line)
     except (ValueError, OSError) as e:
-      logger.info('an exception occured in do_read')
-      logger.debug(e)
+      LOGGER.info('an exception occured in do_read')
+      LOGGER.debug(e, exc_info=1)
       raise StopLogException
     return
 
 
   def run(self):
-    logger.debug('entering Log.run')
+    LOGGER.debug('entering Log.run')
     while self.running:
       try:
         self.do_read()
       except StopLogException:
         break
     self.running = False
-    logger.debug('exiting Log.run')
+    LOGGER.debug('exiting Log.run')
     return
 
 
@@ -331,7 +331,7 @@ class Server(threading.Thread):
     try:
       self.sock.bind(self.address)
     except OSError:
-      logger.error('Address already in use: ' + self.address)
+      LOGGER.error('Address already in use: ' + self.address)
       self.stop()
       return
     self.sock.listen()
@@ -384,7 +384,7 @@ class Server(threading.Thread):
         if err != None and len(err) > 0:
           print(err, file=sys.stderr)
       except subprocess.TimeoutExpired:
-        logger.warning('Timeout for subprocess exit has expired, '
+        LOGGER.warning('Timeout for subprocess exit has expired, '
                         + 'sending the kill signal.')
         self.sub.kill()
       self.log.write(out)
@@ -406,7 +406,7 @@ class Server(threading.Thread):
 
 
   def shell_server(self, server, connection, *args):
-    logger.debug('shell_server was called')
+    LOGGER.debug('shell_server was called')
     connection.settimeout(server.timeout)
 
     try:
@@ -433,15 +433,15 @@ class Server(threading.Thread):
         shell_stream.write('The server has shut down.')
       shell_stream.close()
     except Exception as e:
-      logger.error('an exception occured in shell_server')
-      logger.debug(e)
+      LOGGER.error('an exception occured in shell_server')
+      LOGGER.debug(e, exc_info=1)
     finally:
       try:
         server.log.write_streams.remove(shell_stream)
       except ValueError:
         pass
       connection.close()
-      logger.debug('shell_server is returning')
+      LOGGER.debug('shell_server is returning')
       return
 
 
@@ -579,11 +579,15 @@ class Shell(Log):
         break
       if len(line) == 0:
         line = '~'
-      line = line.rstrip('\n\r')
+      line = line.rstrip('\n\r').expandtabs(4)
       blocks = self.split_string(line, max_x-1)
       blocks.reverse()
       for block in blocks:
-        self.logwin.addstr(n, 0, block)
+        try:
+          self.logwin.addstr(n, 0, block)
+        except Exception as e:
+          logging.warning('An error occured in the curses library.')
+          logging.debug(e, exc_info=1)
         n -= 1
         if n < 0:
           break
